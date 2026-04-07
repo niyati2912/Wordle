@@ -1,0 +1,97 @@
+HTML FILE EXPLANATION 
+
+ We have build the html for the solepurpose of doing DOM manipulation in it
+-- data-row and data-key helps to select each key 
+-- <div class="tile" data-row="0" data-index="2"></div> this is like a array its telling i want this position
+idex on this Row
+    
+    ROW — data-row attribute
+    data-* attributes are custom HTML attributes. They store
+    extra information that has no visual effect but is very
+    useful in JavaScript:
+        const row = document.querySelector('[data-row="0"]');
+    They are also queryable in CSS:
+        [data-row] { ... }
+    We use data-row="0" … "5" so JS can find the active row
+    by its index (e.g., currentRow = 0 at game start).
+ 
+
+        TILE — data-index attribute
+        Each tile has a data-index so JS can target a specific
+        cell within the current row:
+        const tile = document.querySelector(
+            '[data-row="0"] [data-index="2"]'
+        );
+        The class "tile" is the CSS hook for styling (border, size,
+        font) and will also receive state classes later:
+        tile.classList.add('correct');   // green
+        tile.classList.add('present');   // yellow
+        tile.classList.add('absent');    // gray
+        The tile is a <div> (not a <span>) because it's a block-
+        level box that holds visible content and animation state.
+
+
+
+
+       
+KEYBOARD SECTION
+<section> groups related content with an implied heading context.
+id="keyboard" lets JS attach a single delegated event listener
+to the whole keyboard:
+    document.getElementById('keyboard')
+    .addEventListener('click', handleKeyClick);
+This is more efficient than adding a listener to every button.
+
+The buttons use data-key to store the logical key value JS needs:
+    e.target.dataset.key  →  "A", "Enter", "Backspace"
+This avoids parsing innerText (which could break with icons).
+
+
+BUTTON SECTION
+    Each button has:
+        class="key"      → CSS styling hook
+        data-key="Q"     → JS reads this to know which letter was pressed
+        aria-label       → tells screen readers what the button does
+
+
+
+    "Enter" and "Backspace" get the extra class "key--wide" so
+    CSS can make them wider. The data-key value exactly matches
+    the KeyboardEvent.key value from physical keyboards:
+        document.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { ... }
+        if (e.key === 'Backspace') { ... }
+        });
+    Using the same strings for data-key keeps the physical
+    keyboard handler and the on-screen click handler unified.
+
+
+CSS FILE 
+
+this ads the text boxes to the website 
+.tile {
+  width: var(--tile-size);
+  height: var(--tile-size);
+}
+
+
+display: flex;
+align-items: center;
+justify-content: center;  this centers the text in the file 
+
+
+
+for showing the correct word to the user we have used 
+
+.tile.correct { background-color: green; }
+.tile.present { background-color: yellow; }
+.tile.absent { background-color: gray; }
+
+this is to make the site responsive @media (max-width: 360px)
+
+JS LOGIC
+
+we need to do three things 
+1 listen to the action of the user 
+2 decide what is happenening 
+3 update the ui acd to the function the user are doing 

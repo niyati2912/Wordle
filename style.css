@@ -1,0 +1,467 @@
+/* =============================================================
+style.css — Wordle Clone
+Companion stylesheet for index.html
+
+TABLE OF CONTENTS
+1. Custom Properties (CSS Variables)
+2. Reset & Base
+3. Layout — Header
+4. Layout — Message Container
+5. Layout — Game Board & Tiles
+6. Tile State Classes  ← JS adds these at runtime
+7. Animations          ← JS triggers these via class toggling
+8. Layout — Keyboard
+9. Key State Classes   ← JS adds these to colour the keyboard
+10. Responsive Tweaks
+============================================================= */
+
+
+/* ─────────────────────────────────────────────────────────────
+1. CUSTOM PROPERTIES
+Centralise every colour and size here. When JS needs to read
+a colour (rare, but possible), it can do:
+    getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-correct');
+More importantly, changing a theme means editing one place.
+───────────────────────────────────────────────────────────── */
+:root {
+/* Tile state colours */
+--color-correct:  #538d4e;   /* green  — right letter, right spot  */
+--color-present:  #b59f3b;   /* yellow — right letter, wrong spot  */
+--color-absent:   #3a3a3c;   /* dark gray — letter not in word     */
+--color-empty:    #121213;   /* unfilled tile background           */
+--color-filled:   #121213;   /* filled-but-not-submitted tile bg   */
+
+/* Border colours */
+--border-empty:   #3a3a3c;
+--border-filled:  #565758;   /* slightly lighter when a letter is typed */
+--border-focus:   #999;
+
+/* Surface & text */
+--color-bg:       #121213;
+--color-surface:  #1a1a1b;
+--color-text:     #ffffff;
+--color-subtext:  #818384;
+
+/* Key colours */
+--color-key-bg:      #818384;
+--color-key-text:    #ffffff;
+
+/* Sizing */
+--tile-size:   62px;
+--tile-gap:    5px;
+--key-height:  58px;
+
+/* Typography */
+--font-main: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+2. RESET & BASE
+───────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+box-sizing: border-box;
+margin: 0;
+padding: 0;
+}
+
+html, body {
+height: 100%;
+}
+
+body {
+background-color: var(--color-bg);
+color: var(--color-text);
+font-family: var(--font-main);
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+3. HEADER
+───────────────────────────────────────────────────────────── */
+header {
+width: 100%;
+max-width: 500px;
+border-bottom: 1px solid var(--border-empty);
+padding: 12px 0;
+text-align: center;
+}
+
+header h1 {
+font-size: 1.75rem;
+font-weight: 700;
+letter-spacing: 0.2em;
+text-transform: uppercase;
+color: var(--color-text);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+4. MESSAGE CONTAINER
+Positioned so JS can make it appear/disappear without
+affecting the layout of the board below it.
+JS usage example:
+    messageContainer.textContent = 'Not in word list';
+    messageContainer.classList.add('visible');
+    setTimeout(() => messageContainer.classList.remove('visible'), 1500);
+───────────────────────────────────────────────────────────── */
+#message-container {
+position: fixed;          /* float above the board, never displace tiles */
+top: 80px;
+left: 50%;
+transform: translateX(-50%);
+z-index: 100;
+
+background-color: var(--color-text);
+color: var(--color-bg);
+font-weight: 700;
+font-size: 0.875rem;
+letter-spacing: 0.05em;
+padding: 12px 20px;
+border-radius: 4px;
+
+/* Hidden by default — JS adds .visible to show it */
+opacity: 0;
+pointer-events: none;
+transition: opacity 0.2s ease;
+}
+
+/*
+.visible is toggled by JS to show/hide alerts.
+Using a class (rather than display:none/block) allows
+CSS transitions to animate the opacity change smoothly.
+*/
+#message-container.visible {
+opacity: 1;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+5. GAME BOARD & TILES
+───────────────────────────────────────────────────────────── */
+
+/*
+<main> centres the game board vertically in the remaining
+space, using flex-grow so it expands to push the keyboard
+toward the bottom.
+*/
+main {
+flex: 1;
+display: flex;
+align-items: center;
+justify-content: center;
+padding: 20px 0;
+}
+
+/*
+#game-board uses CSS Grid to stack the 6 rows.
+A named grid makes it easy to add rows later if you
+extend the game (e.g., hard mode with 7 guesses).
+*/
+#game-board {
+display: grid;
+grid-template-rows: repeat(6, var(--tile-size));
+gap: var(--tile-gap);
+}
+
+/*
+.tile-row lays out the 5 tiles in a row using Flexbox.
+Flexbox is ideal here because all tiles are the same size
+and we just need equal spacing.
+*/
+.tile-row {
+display: flex;
+gap: var(--tile-gap);
+}
+
+/*
+.tile is the core interactive element.
+- width/height are set via the CSS variable so changing
+--tile-size resizes everything at once.
+- border-color starts as --border-empty; JS changes it to
+--border-filled when a letter is typed.
+- transition on border-color gives a smooth feel.
+- perspective is set on the tile itself so the CSS 3D flip
+animation (see Section 7) works correctly.
+*/
+.tile {
+width: var(--tile-size);
+height: var(--tile-size);
+
+display: flex;
+align-items: center;
+justify-content: center;
+
+font-size: 2rem;
+font-weight: 700;
+text-transform: uppercase;
+user-select: none;         /* prevent accidental text selection on click */
+
+background-color: var(--color-empty);
+border: 2px solid var(--border-empty);
+border-radius: 3px;
+
+transition: border-color 0.1s ease;
+
+/* 3D flip perspective must be on the element (or its parent) */
+perspective: 250px;
+}
+
+/*
+.tile[data-letter] — added by JS when a letter is typed.
+CSS attribute selectors let you style elements based on
+whether a data-attribute exists, without touching JS styles.
+JS: tile.dataset.letter = 'A';
+CSS: [data-letter] { border-color: var(--border-filled); }
+*/
+.tile[data-letter] {
+border-color: var(--border-filled);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+6. TILE STATE CLASSES
+JS adds these after the player submits a row, e.g.:
+    tile.classList.add('correct');
+    tile.classList.add('present');
+    tile.classList.add('absent');
+
+These classes override the default border & background.
+Because they're applied AFTER the flip animation starts,
+the new colour is revealed as the tile turns over — the
+same mechanic as the original Wordle.
+───────────────────────────────────────────────────────────── */
+
+.tile.correct {
+background-color: var(--color-correct);
+border-color: var(--color-correct);
+color: var(--color-text);
+}
+
+.tile.present {
+background-color: var(--color-present);
+border-color: var(--color-present);
+color: var(--color-text);
+}
+
+.tile.absent {
+background-color: var(--color-absent);
+border-color: var(--color-absent);
+color: var(--color-text);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+7. ANIMATIONS
+Two animations are provided:
+    a) .tile--flip   — the reveal flip (triggered per tile)
+    b) .tile--bounce — the "pop" when typing a letter
+    c) .tile-row--shake — invalid word shake (row level)
+
+JS triggers them by adding the class, then removes it after
+the animation ends so it can be re-triggered cleanly:
+
+    tile.classList.add('tile--flip');
+    tile.addEventListener('animationend', () => {
+    tile.classList.remove('tile--flip');
+    }, { once: true });
+───────────────────────────────────────────────────────────── */
+
+/* -- a) FLIP (reveal) ----------------------------------------
+rotateX flips the tile on its horizontal axis.
+The colour change (added by JS mid-animation via state classes)
+becomes visible at the 50% point when the tile is edge-on.
+*/
+@keyframes flip {
+0%   { transform: rotateX(0deg);    }
+45%  { transform: rotateX(-90deg);  }  /* edge-on — colour swaps here  */
+55%  { transform: rotateX(-90deg);  }
+100% { transform: rotateX(0deg);    }
+}
+
+.tile--flip {
+animation: flip 0.5s ease-in-out forwards;
+/*
+JS staggers the delay per tile so they flip one after another:
+    tile.style.animationDelay = `${index * 0.1}s`;
+*/
+}
+
+/* -- b) BOUNCE (letter typed) --------------------------------
+A quick scale-up/down pop gives tactile feedback when the
+player presses a key. Subtle — just enough to feel responsive.
+*/
+@keyframes bounce {
+0%   { transform: scale(1);    }
+50%  { transform: scale(1.12); }
+100% { transform: scale(1);    }
+}
+
+.tile--bounce {
+animation: bounce 0.1s ease-in-out;
+}
+
+/* -- c) SHAKE (invalid word) ---------------------------------
+Applied to the whole .tile-row when the word isn't in the
+list. translateX shakes the row left-right.
+JS: row.classList.add('tile-row--shake');
+*/
+@keyframes shake {
+0%, 100% { transform: translateX(0);    }
+15%       { transform: translateX(-6px); }
+30%       { transform: translateX(6px);  }
+45%       { transform: translateX(-6px); }
+60%       { transform: translateX(6px);  }
+75%       { transform: translateX(-4px); }
+90%       { transform: translateX(4px);  }
+}
+
+.tile-row--shake {
+animation: shake 0.5s ease-in-out;
+}
+
+/* -- d) WIN BOUNCE (whole row dances on win) -----------------
+JS applies this with staggered animation-delay on each tile
+in the winning row.
+*/
+@keyframes win-bounce {
+0%, 100% { transform: translateY(0);    }
+40%       { transform: translateY(-20px); }
+60%       { transform: translateY(-12px); }
+}
+
+.tile--win-bounce {
+animation: win-bounce 0.6s ease-in-out forwards;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+8. KEYBOARD
+───────────────────────────────────────────────────────────── */
+
+/*
+#keyboard sits below <main>. It uses Flexbox column to stack
+the three rows, then each .key-row uses Flexbox row for the
+individual keys.
+*/
+#keyboard {
+width: 100%;
+max-width: 500px;
+padding: 0 8px 16px;
+display: flex;
+flex-direction: column;
+gap: 8px;
+}
+
+.key-row {
+display: flex;
+justify-content: center;
+gap: 6px;
+}
+
+/*
+.key — base styles for every keyboard button.
+flex: 1 allows keys to grow equally; max-width caps normal keys.
+We use <button> (not <div>) so keyboard and click events
+work natively without extra JS.
+*/
+.key {
+flex: 1;
+max-width: 43px;
+height: var(--key-height);
+
+background-color: var(--color-key-bg);
+color: var(--color-key-text);
+border: none;
+border-radius: 4px;
+cursor: pointer;
+
+font-family: var(--font-main);
+font-size: 0.8rem;
+font-weight: 700;
+text-transform: uppercase;
+
+display: flex;
+align-items: center;
+justify-content: center;
+
+user-select: none;
+transition: background-color 0.2s ease, filter 0.1s ease;
+}
+
+.key:hover {
+filter: brightness(1.15);
+}
+
+.key:active {
+filter: brightness(0.9);
+}
+
+/*
+.key--wide is for Enter and Backspace.
+flex: 1.5 (plus a higher max-width) makes them 50% wider
+than regular keys without hard-coding pixel values.
+*/
+.key--wide {
+flex: 1.5;
+max-width: 65px;
+font-size: 0.75rem;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+9. KEY STATE CLASSES
+JS applies these to keyboard buttons after evaluating a guess,
+mirroring the tile state classes. The keyboard shows the
+*best* state a letter has achieved across all guesses.
+
+Specificity note: these must come AFTER .key so they override
+the default background-color.
+
+JS usage:
+    const keyEl = document.querySelector(`[data-key="${letter}"]`);
+    keyEl.classList.add('correct'); // or 'present' or 'absent'
+───────────────────────────────────────────────────────────── */
+
+.key.correct {
+background-color: var(--color-correct);
+}
+
+.key.present {
+background-color: var(--color-present);
+}
+
+.key.absent {
+background-color: var(--color-absent);
+color: var(--color-subtext);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+10. RESPONSIVE TWEAKS
+On smaller screens, scale everything down proportionally
+by reducing the custom properties.
+───────────────────────────────────────────────────────────── */
+@media (max-width: 360px) {
+:root {
+--tile-size:  52px;
+--key-height: 50px;
+}
+
+header h1 {
+font-size: 1.4rem;
+}
+
+.key {
+font-size: 0.7rem;
+max-width: 36px;
+}
+
+.key--wide {
+max-width: 56px;
+}
+}
